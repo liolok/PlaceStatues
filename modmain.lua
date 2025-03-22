@@ -49,12 +49,8 @@ local function IsWalkButtonDown()
 end
 local function GetKeyConfig(configname, default)
   local value = GetModConfigData(configname)
-  if type(value) == 'string' and value:len() > 0 then
-    return value:lower():byte()
-  end
-  if type(value) ~= 'number' then
-    return default:lower():byte()
-  end
+  if type(value) == 'string' and value:len() > 0 then return value:lower():byte() end
+  if type(value) ~= 'number' then return default:lower():byte() end
 end
 
 local CENTERBUTTON = GetKeyConfig('CENTERBUTTON', 'P')
@@ -76,9 +72,7 @@ end
 
 local Tempo
 local function HightlightTempo(x, z)
-  if not Indicate and not Carrying then
-    return
-  end
+  if not Indicate and not Carrying then return end
   if not Tempo then
     if _G.PrefabExists('circleplacer') then
       Tempo = _G.SpawnPrefab('circleplacer')
@@ -126,9 +120,7 @@ local function ClosetGenerate()
 end
 
 local function HightlightCloset()
-  if not Indicate and not Carrying then
-    return
-  end
+  if not Indicate and not Carrying then return end
   for i = 0, 7 do
     if Closet[i][1] then
       Closet[i][0]:Show()
@@ -141,9 +133,7 @@ end
 local function HideIndi()
   for i = 0, 7 do
     Closet[i][1] = false
-    if Closet[i][0] then
-      Closet[i][0]:Hide()
-    end
+    if Closet[i][0] then Closet[i][0]:Hide() end
   end
 end
 
@@ -152,9 +142,7 @@ local function TurnCircle(pt)
   local bgx = pt.x
   local bgz = pt.z
 
-  if CenterLocate == nil then
-    return Vector3(bgx, 0, bgz)
-  end
+  if CenterLocate == nil then return Vector3(bgx, 0, bgz) end
 
   local x = CenterLocate.x
   local z = CenterLocate.z
@@ -214,9 +202,7 @@ end
 local function Lineing(pt)
   local bgx = pt.x
   local bgz = pt.z
-  if CenterLocate == nil or SecondLocate == nil then
-    return Vector3(bgx, 0, bgz)
-  end
+  if CenterLocate == nil or SecondLocate == nil then return Vector3(bgx, 0, bgz) end
   local x = CenterLocate.x
   local z = CenterLocate.z
   local DeltaX = bgx - x
@@ -225,9 +211,7 @@ local function Lineing(pt)
   local DeltaAngZ = SecondLocate.z - z
 
   local rdiour = math.sqrt(DeltaAngX ^ 2 + DeltaAngZ ^ 2)
-  if rdiour == 0 then
-    return Vector3(bgx, 0, bgz)
-  end
+  if rdiour == 0 then return Vector3(bgx, 0, bgz) end
 
   local DireAng = math.atan2(DeltaAngX, DeltaAngZ)
   local radius = math.sqrt(DeltaX ^ 2 + DeltaZ ^ 2)
@@ -262,9 +246,7 @@ local function Lineing(pt)
   return Vector3(bgx, 0, bgz)
 end
 
-local function InGame()
-  return ThePlayer and ThePlayer.HUD and not ThePlayer.HUD:HasInputFocus()
-end
+local function InGame() return ThePlayer and ThePlayer.HUD and not ThePlayer.HUD:HasInputFocus() end
 
 local function Distance(PointX, PointZ)
   local xx, yy, zz = ThePlayer.Transform:GetWorldPosition()
@@ -277,9 +259,7 @@ local function LongWalk(pos)
   local PlayerController = ThePlayer.components.playercontroller
   local act = BufferedAction(ThePlayer, nil, ACTIONS.WALKTO, ThePlayer.replica.inventory:GetActiveItem(), pos)
   if PlayerController:CanLocomote() then
-    act.preview_cb = function()
-      SendRPCToServer(RPC.LeftClick, act.action.code, pos.x, pos.z, nil, true)
-    end
+    act.preview_cb = function() SendRPCToServer(RPC.LeftClick, act.action.code, pos.x, pos.z, nil, true) end
     PlayerController:DoAction(act)
   else
     SendRPCToServer(RPC.LeftClick, act.action.code, pos.x, pos.z, nil, nil, nil, act.action.canforce)
@@ -301,13 +281,9 @@ end
 local function GetRoutePos(Radius0, x1, z1, Radius1)
   local x0, y0, z0 = ThePlayer.Transform:GetWorldPosition()
   local d = math.sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0))
-  if d == 0 then
-    return nil
-  end
+  if d == 0 then return nil end
   local a = (Radius0 * Radius0 - Radius1 * Radius1 + d * d) / (2 * d)
-  if Radius0 < a then
-    return nil
-  end
+  if Radius0 < a then return nil end
   local h = math.sqrt(Radius0 * Radius0 - a * a)
   local x2 = x0 + a * (x1 - x0) / d
   local z2 = z0 + a * (z1 - z0) / d
@@ -328,9 +304,7 @@ end
 
 local function Wonlerina(inst, PointX, PointZ, StepDistance)
   local Distate = 0
-  if IsWalkButtonDown() then
-    return
-  end
+  if IsWalkButtonDown() then return end
   if GLOBAL.ThePlayer:HasTag('idle') and not GLOBAL.ThePlayer.components.playercontroller:IsDoingOrWorking() then
     if StepDistance > 0 then
       if Distance(PointX, PointZ) > 0.3 then
@@ -378,9 +352,7 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
         local xD = PreviousPlayerPost.x - xx
         local zD = PreviousPlayerPost.z - zz
         local Dist = math.sqrt(xD * xD + zD * zD)
-        if Dist > 0.01 then
-          Distate = Dist
-        end
+        if Dist > 0.01 then Distate = Dist end
         PreviousPlayerPost = nil
       end
     end
@@ -428,9 +400,7 @@ local function GetCorrectPoint()
     z = CircleSet.z
     --AlreadyShowIndicator
   elseif CorrectionSetting == 2 then -- Hexa
-    if not CenterLocate then
-      return Vector3(x, 0, z)
-    end
+    if not CenterLocate then return Vector3(x, 0, z) end
 
     if not GridTweak then
       if round((z - CenterLocate.z) / 0.86602540378) % 2 ~= 1 then
@@ -494,9 +464,7 @@ end
 
 local gridplacer
 local function HightlightDrop()
-  if not Indicate and not Carrying then
-    return
-  end
+  if not Indicate and not Carrying then return end
   if not gridplacer then
     if _G.PrefabExists('circleplacer') then
       gridplacer = _G.SpawnPrefab('circleplacer')
@@ -514,9 +482,7 @@ end
 
 local DropCenter
 local function HightlightCenter()
-  if not CenterLocate then
-    return
-  end
+  if not CenterLocate then return end
   if not DropCenter then
     if _G.PrefabExists('circleplacer') then
       DropCenter = _G.SpawnPrefab('circleplacer')
@@ -536,9 +502,7 @@ end
 
 local SecondDrop
 local function HightlightSecond()
-  if not SecondLocate then
-    return
-  end
+  if not SecondLocate then return end
   if not SecondDrop then
     if _G.PrefabExists('circleplacer') then
       SecondDrop = _G.SpawnPrefab('circleplacer')
@@ -557,25 +521,15 @@ local function HightlightSecond()
 end
 
 local function HideAll()
-  if Tempo then
-    Tempo:Hide()
-  end
-  if gridplacer then
-    gridplacer:Hide()
-  end
-  if DropCenter then
-    DropCenter:Hide()
-  end
-  if SecondDrop then
-    SecondDrop:Hide()
-  end
+  if Tempo then Tempo:Hide() end
+  if gridplacer then gridplacer:Hide() end
+  if DropCenter then DropCenter:Hide() end
+  if SecondDrop then SecondDrop:Hide() end
   HideIndi()
 end
 
 local function SetCenterPoint()
-  if not InGame() then
-    return
-  end
+  if not InGame() then return end
   if not TheInput:IsKeyDown(GLOBAL.KEY_CTRL) then
     local xx = round(TheInput:GetWorldPosition().x)
     local zz = round(TheInput:GetWorldPosition().z)
@@ -599,9 +553,7 @@ local function SetCenterPoint()
 end
 
 local function SetSecondPoint()
-  if not InGame() then
-    return
-  end
+  if not InGame() then return end
   if not TheInput:IsKeyDown(GLOBAL.KEY_CTRL) then
     local xx = round(TheInput:GetWorldPosition().x)
     local zz = round(TheInput:GetWorldPosition().z)
@@ -631,9 +583,7 @@ local function ToggleIndicator()
 end
 
 local function TogglePreciseWalk()
-  if not InGame() then
-    return
-  end
+  if not InGame() then return end
   --Turn on/off indicator
   Indicate = not Indicate
   if not Indicate then
