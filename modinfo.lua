@@ -1,12 +1,13 @@
--- This information tells other players more about the mod
 name = 'Place Statues'
-
 description =
   'Client mod allow you to drop statues on the right point in other people server and do art with statues.\n Press R to enable Walking.\n Press  to walk to chosen point (Accuracy is 0.01 size of the statue).\n Press Z to drop statue to current place you standing.\n Press Ctr+P to change type of drop.\n Press Ctr+O to tweak drop by 0.5 grid.'
-author = 'Tranoze'
+author = 'Tranoze, liolok'
 version = '1.1.0'
-
 api_version = 10
+dst_compatible = true
+client_only_mod = true
+icon_atlas = 'modicon.xml'
+icon = 'modicon.tex'
 
 local opt_Empty = { { description = '', data = 0 } }
 local function Title(title, hover)
@@ -73,13 +74,3 @@ configuration_options = {
     hover = 'A key to show you where you going to drop the statue',
   },
 }
-all_clients_require_mod = false
-client_only_mod = true
-dont_starve_compatible = false
-dst_compatible = true
-reign_of_giants_compatible = false
-shipwrecked_compatible = false
-
--- Can specify a custom icon for this mod!
-icon_atlas = 'modicon.xml'
-icon = 'modicon.tex'
