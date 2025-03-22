@@ -1,3 +1,5 @@
+modimport('keybind')
+
 PrefabFiles = {
   'CirclePlacer',
 }
@@ -570,7 +572,7 @@ local function HideAll()
   HideIndi()
 end
 
-GLOBAL.TheInput:AddKeyDownHandler(CENTERBUTTON, function()
+local function SetCenterPoint()
   if not InGame() then
     return
   end
@@ -594,8 +596,9 @@ GLOBAL.TheInput:AddKeyDownHandler(CENTERBUTTON, function()
     CorrectionSetting = (CorrectionSetting + 1) % TotalSetting
     GLOBAL.ThePlayer.components.talker:Say(Settings[CorrectionSetting] .. '\n Press Ctr+O to tweak position by 0.5')
   end
-end)
-GLOBAL.TheInput:AddKeyDownHandler(SECONDPOINTDO, function()
+end
+
+local function SetSecondPoint()
   if not InGame() then
     return
   end
@@ -612,18 +615,7 @@ GLOBAL.TheInput:AddKeyDownHandler(SECONDPOINTDO, function()
       GLOBAL.ThePlayer.components.talker:Say('UnTweaked')
     end
   end
-end)
-
-GLOBAL.TheInput:AddKeyDownHandler(DROPDEBUTT, function()
-  if not InGame() then
-    return
-  end
-  local StatueB = _G.EQUIPSLOTS.BODY
-  local Statue = ThePlayer.replica.inventory:GetEquippedItem(StatueB)
-  if Statue and Statue:HasTag('heavy') then
-    ThePlayer.replica.inventory:DropItemFromInvTile(Statue)
-  end
-end)
+end
 
 local IsIndicate = false
 local function ToggleIndicator()
@@ -637,7 +629,8 @@ local function ToggleIndicator()
     HightlightDrop()
   end
 end
-GLOBAL.TheInput:AddKeyDownHandler(WALKINGTOGGLE, function()
+
+local function TogglePreciseWalk()
   if not InGame() then
     return
   end
@@ -649,7 +642,29 @@ GLOBAL.TheInput:AddKeyDownHandler(WALKINGTOGGLE, function()
     GLOBAL.ThePlayer.components.talker:Say('Precision Walking\n Please disable lag compensation\n Use  to walk')
   end
   ToggleIndicator()
-end)
+end
+
+local callback = { -- config name to function called when the key event triggered
+  CENTERBUTTON = SetCenterPoint,
+  SECONDPOINTDO = SetSecondPoint,
+  WALKINGTOGGLE = TogglePreciseWalk,
+}
+
+local handler = {} -- config name to key event handlers
+function KeyBind(name, key)
+  if handler[name] then handler[name]:Remove() end -- disable old binding
+  if key ~= nil then -- new binding
+    if key >= 1000 then -- it's a mouse button
+      handler[name] = GLOBAL.TheInput:AddMouseButtonHandler(function(button, down, x, y)
+        if button == key and down then callback[name]() end
+      end)
+    else -- it's a keyboard key
+      handler[name] = GLOBAL.TheInput:AddKeyDownHandler(key, callback[name])
+    end
+  else -- no binding
+    handler[name] = nil
+  end
+end
 
 AddComponentPostInit('playercontroller', function(self)
   ThePlayer = _G.ThePlayer
