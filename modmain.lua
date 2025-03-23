@@ -619,7 +619,7 @@ function PlayerController:OnUpdate(Time)
   if InGame() then
     local StatueB = _G.EQUIPSLOTS.BODY
     local Statue = ThePlayer.replica.inventory:GetEquippedItem(StatueB)
-    if Statue and Statue:HasTag('heavy') then
+    if Statue and Statue:HasTag('heavy') and GetModConfigData('auto_enable') then
       Carrying = true
     else
       Carrying = false

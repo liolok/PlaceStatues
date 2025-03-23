@@ -50,7 +50,16 @@ for i = 1, #numpad do
   keys[#keys + 1] = { description = 'Numpad ' .. key, data = 'KEY_KP_' .. key:upper() }
 end
 
+local boolean = { { description = 'No', data = false }, { description = 'Yes', data = true } }
+
 configuration_options = {
+  {
+    name = 'auto_enable',
+    label = 'Auto Enable',
+    hover = 'Auto enable precise placement when carrying heavy stuffs.',
+    options = boolean,
+    default = true,
+  },
   Title('Control setting'),
   {
     name = 'CENTERBUTTON',
