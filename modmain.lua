@@ -47,16 +47,6 @@ local function IsWalkButtonDown()
     _G.CONTROL_MOVE_RIGHT
   )
 end
-local function GetKeyConfig(configname, default)
-  local value = GetModConfigData(configname)
-  if type(value) == 'string' and value:len() > 0 then return value:lower():byte() end
-  if type(value) ~= 'number' then return default:lower():byte() end
-end
-
-local CENTERBUTTON = GetKeyConfig('CENTERBUTTON', 'P')
-local SECONDPOINTDO = GetKeyConfig('SECONDPOINTDO', 'O')
-local DROPDEBUTT = GetKeyConfig('DROPDEBUTT', 'Z')
-local WALKINGTOGGLE = GetKeyConfig('WALKINGTOGGLE', 'B')
 
 function round(num)
   local under = math.floor(num)
