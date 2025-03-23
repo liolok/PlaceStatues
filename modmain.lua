@@ -24,12 +24,12 @@ local Timer = 0.8
 
 local CorrectionSetting = 0
 local Settings = {
-  [0] = 'GridDrop',
-  [1] = 'CircleDrop - Press P to set center',
-  [2] = 'HexaDrop',
-  [3] = 'Line - Press P and O to set 2 different point in the line',
-
-  [4] = 'PentaCircle', -- If you are reading this, that mean you dig into my mod, this just a custom scupture set up in my private version
+  [0] = '[Place Statues]\nGrid',
+  [1] = '[Place Statues]\nCircle\n(need set center point)',
+  [2] = '[Place Statues]\nHexagon\n(need set center point)',
+  [3] = '[Place Statues]\nLine\n(need set start & end point)',
+  -- Tranoze: If you are reading this, that mean you dig into my mod, this just a custom sculpture set up in my private version
+  [4] = 'PentaCircle',
   [5] = 'CustomPentaLine', -- same as above
 }
 local TotalSetting = 4
@@ -518,45 +518,47 @@ local function HideAll()
   HideIndi()
 end
 
-local function SetCenterPoint()
-  if not InGame() then return end
-  if not TheInput:IsKeyDown(GLOBAL.KEY_CTRL) then
+local function ChangePlacementType()
+  if not CenterLocate then
     local xx = round(TheInput:GetWorldPosition().x)
     local zz = round(TheInput:GetWorldPosition().z)
     CenterLocate = Vector3(xx, 0, zz)
-  else
-    if not CenterLocate then
-      local xx = round(TheInput:GetWorldPosition().x)
-      local zz = round(TheInput:GetWorldPosition().z)
-      CenterLocate = Vector3(xx, 0, zz)
-    end
-    if not SecondLocate then
-      local xx, yy, zz = ThePlayer.Transform:GetWorldPosition()
-      xx = round(xx)
-      zz = round(zz)
-      SecondLocate = Vector3(xx, 0, zz)
-    end
-    HideAll()
-    CorrectionSetting = (CorrectionSetting + 1) % TotalSetting
-    GLOBAL.ThePlayer.components.talker:Say(Settings[CorrectionSetting] .. '\n Press Ctr+O to tweak position by 0.5')
   end
+  if not SecondLocate then
+    local xx, yy, zz = ThePlayer.Transform:GetWorldPosition()
+    xx = round(xx)
+    zz = round(zz)
+    SecondLocate = Vector3(xx, 0, zz)
+  end
+  HideAll()
+  CorrectionSetting = (CorrectionSetting + 1) % TotalSetting
+  GLOBAL.ThePlayer.components.talker:Say(Settings[CorrectionSetting])
+end
+
+local function ToggleAlignTarget()
+  GridTweak = not GridTweak
+  if GridTweak then
+    GLOBAL.ThePlayer.components.talker:Say('[Place Statues] Align to Wall')
+  else
+    GLOBAL.ThePlayer.components.talker:Say('[Place Statues] Align to Turf')
+  end
+end
+
+local function SetFirstPoint()
+  if not InGame() then return end
+  -- local xx = round(TheInput:GetWorldPosition().x)
+  -- local zz = round(TheInput:GetWorldPosition().z)
+  local p = TheInput:GetWorldPosition()
+  CenterLocate = Vector3(round(p.x), 0, round(p.z))
 end
 
 local function SetSecondPoint()
   if not InGame() then return end
-  if not TheInput:IsKeyDown(GLOBAL.KEY_CTRL) then
-    local xx = round(TheInput:GetWorldPosition().x)
-    local zz = round(TheInput:GetWorldPosition().z)
-    SecondLocate = Vector3(xx, 0, zz)
-    HightlightSecond()
-  else
-    GridTweak = not GridTweak
-    if GridTweak then
-      GLOBAL.ThePlayer.components.talker:Say('Tweaked')
-    else
-      GLOBAL.ThePlayer.components.talker:Say('UnTweaked')
-    end
-  end
+  -- local xx = round(TheInput:GetWorldPosition().x)
+  -- local zz = round(TheInput:GetWorldPosition().z)
+  local p = TheInput:GetWorldPosition()
+  SecondLocate = Vector3(round(p.x), 0, round(p.z))
+  HightlightSecond()
 end
 
 local IsIndicate = false
@@ -577,17 +579,21 @@ local function TogglePreciseWalk()
   --Turn on/off indicator
   Indicate = not Indicate
   if not Indicate then
-    GLOBAL.ThePlayer.components.talker:Say('Disabled precision Walking')
+    GLOBAL.ThePlayer.components.talker:Say('[Place Statues] Precise Walk Disabled')
   else
-    GLOBAL.ThePlayer.components.talker:Say('Precision Walking\n Please disable lag compensation\n Use  to walk')
+    GLOBAL.ThePlayer.components.talker:Say(
+      '[Place Statues] Precision Walk Enabled\nPlease disable lag compensation\n Use  to walk'
+    )
   end
   ToggleIndicator()
 end
 
 local callback = { -- config name to function called when the key event triggered
-  CENTERBUTTON = SetCenterPoint,
-  SECONDPOINTDO = SetSecondPoint,
-  WALKINGTOGGLE = TogglePreciseWalk,
+  precise_walk_key = TogglePreciseWalk,
+  placement_type_key = ChangePlacementType,
+  align_target_key = ToggleAlignTarget,
+  first_point_key = SetFirstPoint,
+  second_point_key = SetSecondPoint,
 }
 
 local handler = {} -- config name to key event handlers
@@ -619,7 +625,7 @@ function PlayerController:OnUpdate(Time)
   if InGame() then
     local StatueB = _G.EQUIPSLOTS.BODY
     local Statue = ThePlayer.replica.inventory:GetEquippedItem(StatueB)
-    if Statue and Statue:HasTag('heavy') and GetModConfigData('auto_enable') then
+    if Statue and Statue:HasTag('heavy') and GetModConfigData('auto_precise_walk') then
       Carrying = true
     else
       Carrying = false

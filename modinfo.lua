@@ -9,18 +9,6 @@ client_only_mod = true
 icon_atlas = 'modicon.xml'
 icon = 'modicon.tex'
 
-local opt_Empty = { { description = '', data = 0 } }
-local function Title(title, hover)
-  return {
-    name = title,
-    --label=title,
-    hover = hover,
-    options = opt_Empty,
-    default = 0,
-  }
-end
-local SEPARATOR = Title('')
-
 local keyboard = { -- from STRINGS.UI.CONTROLSSCREEN.INPUTS[1] of strings.lua, need to match constants.lua too.
   { 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'Print', 'ScrolLock', 'Pause' },
   { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0' },
@@ -54,32 +42,45 @@ local boolean = { { description = 'No', data = false }, { description = 'Yes', d
 
 configuration_options = {
   {
-    name = 'auto_enable',
-    label = 'Auto Enable',
-    hover = 'Auto enable precise placement when carrying heavy stuffs.',
+    name = 'auto_precise_walk',
+    label = 'Auto Precise Walk',
+    hover = 'Enable precise walk when carrying heavy item.',
     options = boolean,
     default = true,
   },
-  Title('Control setting'),
   {
-    name = 'CENTERBUTTON',
-    label = 'Center Button ',
+    name = 'precise_walk_key',
+    label = 'Manual Precise Walk',
+    hover = 'Key to let you walk to a precise position, whether carrying heavy item or not.',
     options = keys,
-    default = 'KEY_P',
-    hover = 'A key to set center point of most of the Statues placement.\n(Ctr + key to change placement type)',
+    default = 'KEY_INSERT',
   },
   {
-    name = 'SECONDPOINTDO',
-    label = 'Second Point Button',
+    name = 'placement_type_key',
+    label = 'Change Placement Type',
+    hover = 'Key to change placement type through grid/circle/hexagon/line.',
     options = keys,
-    default = 'KEY_O',
-    hover = 'A key to set second point for line or some of the Statues placement.\n (Ctr + key to tweak placement by a bit)',
+    default = 'KEY_PAGEUP',
   },
   {
-    name = 'WALKINGTOGGLE',
-    label = 'Walking toggle Button',
+    name = 'align_target_key',
+    label = 'Toggle Align Target',
+    hover = 'Key to toggle align target between Wall and Turf.',
     options = keys,
-    default = 'KEY_R',
-    hover = 'A key to show you where you going to drop the statue',
+    default = 'KEY_PAGEDOWN',
+  },
+  {
+    name = 'first_point_key',
+    label = 'Set Center/Start Point',
+    hover = 'Key to set cursor position as the center point of circle/hexagon.\n(Or the start point of line)',
+    options = keys,
+    default = 'KEY_HOME',
+  },
+  {
+    name = 'second_point_key',
+    label = 'Set End Point',
+    hover = 'Key to set cursor position as the end point of line.',
+    options = keys,
+    default = 'KEY_END',
   },
 }
