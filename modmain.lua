@@ -5,10 +5,8 @@ Assets = { Asset('ANIM', 'anim/circleplacer.zip') }
 
 local G = GLOBAL
 
-local require = G.require
-
 local Task = nil
-local Timer = 0.8
+local WALK_DELAY = 0.8
 
 local CorrectionSetting = 0
 local Settings = {
@@ -24,8 +22,6 @@ local TotalSetting = 4
 local CenterLocate = nil
 local SecondLocate = nil
 local GridTweak = false
-local Indicate = false
-local Carrying = false
 
 local function IsWalkButtonDown()
   return G.ThePlayer.components.playercontroller:IsAnyOfControlsPressed(
@@ -81,8 +77,13 @@ local function ClosetGenerate()
   end
 end
 
+local is_enabled = false -- does player enable precise walk manually?
+local is_carrying = false -- is player carrying heavy item?
+local AUTO_ENABLE = GetModConfigData('auto_precise_walk') -- did user configure "Auto Precise Walk" to true?
+local function IsEnabled() return is_enabled or (AUTO_ENABLE and is_carrying) end
+
 local function HightlightCloset()
-  if not Indicate and not Carrying then return end
+  if not IsEnabled() then return end
   for i = 0, 7 do
     if Closet[i][1] then
       Closet[i][0]:Show()
@@ -271,11 +272,11 @@ local function SayFinalDistance(inst, PointX, PointZ)
   G.ThePlayer.components.talker:Say(tostring(CalculateDistance(PointX, PointZ)))
 end
 
-local function Wonlerina(inst, PointX, PointZ, StepDistance)
+local function StartPreciseWalk(inst, PointX, PointZ, StepDistance)
   local Distate = 0
   if IsWalkButtonDown() then return end
   if G.ThePlayer:HasTag('idle') and not G.ThePlayer.components.playercontroller:IsDoingOrWorking() then
-    if StepDistance > 0 then
+    if StepDistance then
       if CalculateDistance(PointX, PointZ) > 0.3 then
         LongWalk(G.Vector3(PointX, 0, PointZ))
       else
@@ -289,7 +290,7 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
             else
               AngleStep = true
               Task = nil
-              G.ThePlayer:DoTaskInTime(Timer, SayFinalDistance, PointX, PointZ)
+              G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
               return
             end
           else
@@ -299,7 +300,7 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
             else
               AngleStep = true
               Task = nil
-              G.ThePlayer:DoTaskInTime(Timer, SayFinalDistance, PointX, PointZ)
+              G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
               return
             end
           end
@@ -307,7 +308,7 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
           ShortStep(G.Vector3(PointX, 0, PointZ))
           AngleStep = true
           Task = nil
-          G.ThePlayer:DoTaskInTime(Timer, SayFinalDistance, PointX, PointZ)
+          G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
           return
         end
       end
@@ -324,9 +325,9 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
     end
   end
   if Distate > 0 then
-    Task = G.ThePlayer:DoTaskInTime(Timer, Wonlerina, PointX, PointZ, Distate)
+    Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, PointX, PointZ, Distate)
   else
-    Task = G.ThePlayer:DoTaskInTime(Timer, Wonlerina, PointX, PointZ, StepDistance)
+    Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, PointX, PointZ, StepDistance)
   end
 end
 
@@ -434,7 +435,7 @@ end
 
 local gridplacer
 local function HightlightDrop()
-  if not Indicate and not Carrying then return end
+  if not IsEnabled() then return end
   if not gridplacer then
     if G.PrefabExists('circleplacer') then
       gridplacer = G.SpawnPrefab('circleplacer')
@@ -534,24 +535,20 @@ local function SetSecondPoint()
   HightlightSecond()
 end
 
-local IsIndicate = false
 local function ToggleIndicator()
-  IsIndicate = Indicate or Carrying
-
-  if not IsIndicate then
-    HideAll()
-  else
+  if IsEnabled() then
     HightlightCenter()
     HightlightSecond()
     HightlightDrop()
+  else
+    HideAll()
   end
 end
 
 local function TogglePreciseWalk()
   if not InGame() then return end
-  --Turn on/off indicator
-  Indicate = not Indicate
-  if not Indicate then
+  is_enabled = not is_enabled
+  if not is_enabled then
     G.ThePlayer.components.talker:Say('[Place Statues] Precise Walk Disabled')
   else
     G.ThePlayer.components.talker:Say(
@@ -587,36 +584,28 @@ end
 
 AddComponentPostInit('playercontroller', function(self)
   G.ThePlayer:DoTaskInTime(0, ClosetGenerate)
+
+  local OldOnUpdate = self.OnUpdate
+  self.OnUpdate = function(self, ...)
+    if InGame() then
+      local item = G.ThePlayer.replica.inventory:GetEquippedItem(G.EQUIPSLOTS.BODY)
+      is_carrying = item and item:HasTag('heavy')
+      ToggleIndicator()
+    end
+    return OldOnUpdate(self, ...)
+  end
+
+  local OldOnLeftUp = self.OnLeftUp
+  self.OnLeftUp = function(self)
+    if InGame() and IsEnabled() and G.TheInput:GetHUDEntityUnderMouse() == nil then
+      if Task ~= nil then
+        Task:Cancel()
+        Task = nil
+      end
+
+      local pos = GetCorrectPoint()
+      Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, pos.x, pos.z)
+    end
+    return OldOnLeftUp(self)
+  end
 end)
-
-PlayerController = require('components/playercontroller')
-local OldOnUpdate = PlayerController.OnUpdate
-
-function PlayerController:OnUpdate(Time)
-  if InGame() then
-    local StatueB = G.EQUIPSLOTS.BODY
-    local Statue = G.ThePlayer.replica.inventory:GetEquippedItem(StatueB)
-    if Statue and Statue:HasTag('heavy') and GetModConfigData('auto_precise_walk') then
-      Carrying = true
-    else
-      Carrying = false
-    end
-    ToggleIndicator()
-  end
-  return OldOnUpdate(self, Time)
-end
-
-local OldOnLeftClick = PlayerController.OnLeftUp
-
-function PlayerController:OnLeftUp()
-  if InGame() and IsIndicate and G.TheInput:GetHUDEntityUnderMouse() == nil then
-    if Task ~= nil then
-      Task:Cancel()
-      Task = nil
-    end
-
-    local Posit = GetCorrectPoint()
-    Task = G.ThePlayer:DoTaskInTime(Timer, Wonlerina, Posit.x, Posit.z, 0)
-  end
-  return OldOnLeftClick(self)
-end
