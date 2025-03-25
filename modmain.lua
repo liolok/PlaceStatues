@@ -210,11 +210,16 @@ end
 
 local function InGame() return G.ThePlayer and G.ThePlayer.HUD and not G.ThePlayer.HUD:HasInputFocus() end
 
-local function Distance(PointX, PointZ)
-  local xx, yy, zz = G.ThePlayer.Transform:GetWorldPosition()
-  local DelX = PointX - xx
-  local DelZ = PointZ - zz
-  return math.sqrt(DelX * DelX + DelZ * DelZ)
+local function GetPlayerPosition()
+  local x, _, z = G.ThePlayer.Transform:GetWorldPosition()
+  return x, z
+end
+
+local function CalculateDistance(target_x, target_z)
+  local player_x, player_z = GetPlayerPosition()
+  local dx = target_x - player_x
+  local dz = target_z - player_z
+  return math.sqrt(dx ^ 2 + dz ^ 2)
 end
 
 local function LongWalk(pos)
@@ -229,38 +234,41 @@ end
 
 local function ShortStep(pos)
   if pos then
-    local Distate = Distance(pos.x, pos.z)
-    if Distate > 0 then
-      local xx, yy, zz = G.ThePlayer.Transform:GetWorldPosition()
-      local Direct = (G.Vector3(pos.x - xx, 0, pos.z - zz) / Distate) * 0.165
-      local Destination = G.Vector3(xx + Direct.x, 0, zz + Direct.z)
-      LongWalk(Destination)
+    local distance = CalculateDistance(pos.x, pos.z)
+    if distance > 0 then
+      local x, z = GetPlayerPosition()
+      local direction = (G.Vector3(pos.x - x, 0, pos.z - z) / distance) * 0.165
+      local destination = G.Vector3(x + direction.x, 0, z + direction.z)
+      LongWalk(destination)
     end
   end
 end
 
-local function GetRoutePos(Radius0, x1, z1, Radius1)
-  local x0, y0, z0 = G.ThePlayer.Transform:GetWorldPosition()
-  local d = math.sqrt((x1 - x0) * (x1 - x0) + (z1 - z0) * (z1 - z0))
+local function GetRoutePosition(player_radius, target_radius, x, z)
+  local d = CalculateDistance(x, z) -- distance between centers of player circle and target circle
   if d == 0 then return nil end
-  local a = (Radius0 * Radius0 - Radius1 * Radius1 + d * d) / (2 * d)
-  if Radius0 < a then return nil end
-  local h = math.sqrt(Radius0 * Radius0 - a * a)
-  local x2 = x0 + a * (x1 - x0) / d
-  local z2 = z0 + a * (z1 - z0) / d
 
-  local x3 = x2 + h * (z1 - z0) / d
-  local z3 = z2 - h * (x1 - x0) / d
-  --print(tostring(math.sqrt((x3-x1)*(x3-x1) + (z3-z1)*(z3-z1))))
+  --  distance from player to its projection of target circle
+  local dp = (player_radius ^ 2 - target_radius ^ 2 + d ^ 2) / (2 * d)
+  if player_radius < dp then return nil end
 
-  return G.Vector3(x3, 0, z3)
+  local player_x, player_z = GetPlayerPosition()
+  local dx, dz = x - player_x, z - player_z
+  local projection_x = player_x + dx * dp / d
+  local projection_z = player_z + dz * dp / d
+
+  local offset = math.sqrt(player_radius ^ 2 - dp ^ 2) -- perpendicular/height offset
+  local intersection_x = projection_x + dz * offset / d
+  local intersection_z = projection_z - dx * offset / d
+
+  return G.Vector3(intersection_x, 0, intersection_z)
 end
 
 local PreviousPlayerPost = nil
 local AngleStep = true
 
 local function SayFinalDistance(inst, PointX, PointZ)
-  G.ThePlayer.components.talker:Say(tostring(Distance(PointX, PointZ)))
+  G.ThePlayer.components.talker:Say(tostring(CalculateDistance(PointX, PointZ)))
 end
 
 local function Wonlerina(inst, PointX, PointZ, StepDistance)
@@ -268,13 +276,13 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
   if IsWalkButtonDown() then return end
   if G.ThePlayer:HasTag('idle') and not G.ThePlayer.components.playercontroller:IsDoingOrWorking() then
     if StepDistance > 0 then
-      if Distance(PointX, PointZ) > 0.3 then
+      if CalculateDistance(PointX, PointZ) > 0.3 then
         LongWalk(G.Vector3(PointX, 0, PointZ))
       else
         if AngleStep then
-          local RelativeDistance = math.floor(Distance(PointX, PointZ) / StepDistance)
+          local RelativeDistance = math.floor(CalculateDistance(PointX, PointZ) / StepDistance)
           if RelativeDistance < 2 then
-            AngPos = GetRoutePos(StepDistance, PointX, PointZ, StepDistance)
+            AngPos = GetRoutePosition(StepDistance, StepDistance, PointX, PointZ)
             if AngPos then
               ShortStep(AngPos)
               AngleStep = false
@@ -285,7 +293,7 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
               return
             end
           else
-            AngPos = GetRoutePos(RelativeDistance * StepDistance, PointX, PointZ, StepDistance)
+            AngPos = GetRoutePosition(RelativeDistance * StepDistance, StepDistance, PointX, PointZ)
             if AngPos then
               ShortStep(AngPos)
             else
@@ -305,15 +313,12 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
       end
     else
       if PreviousPlayerPost == nil then
-        local xx, yy, zz = G.ThePlayer.Transform:GetWorldPosition()
-        PreviousPlayerPost = G.Vector3(xx, yy, zz)
+        local player_x, player_z = GetPlayerPosition()
+        PreviousPlayerPost = G.Vector3(player_x, 0, player_z)
         ShortStep(G.Vector3(PointX, 0, PointZ))
       else
-        local xx, yy, zz = G.ThePlayer.Transform:GetWorldPosition()
-        local xD = PreviousPlayerPost.x - xx
-        local zD = PreviousPlayerPost.z - zz
-        local Dist = math.sqrt(xD * xD + zD * zD)
-        if Dist > 0.01 then Distate = Dist end
+        local d = CalculateDistance(PreviousPlayerPost.x, PreviousPlayerPost.z)
+        if d > 0.01 then Distate = d end
         PreviousPlayerPost = nil
       end
     end
@@ -325,12 +330,16 @@ local function Wonlerina(inst, PointX, PointZ, StepDistance)
   end
 end
 
+local function GetCursorPosition()
+  local p = G.TheInput:GetWorldPosition()
+  return p.x, p.z
+end
+
 local function GetCorrectPoint()
   for i = 0, 7 do
     Closet[i][1] = false
   end
-  local x = G.TheInput:GetWorldPosition().x
-  local z = G.TheInput:GetWorldPosition().z
+  local x, z = GetCursorPosition()
 
   if CorrectionSetting == 0 then -- Grid
     if not GridTweak then
@@ -491,15 +500,12 @@ end
 
 local function ChangePlacementType()
   if not CenterLocate then
-    local xx = round(G.TheInput:GetWorldPosition().x)
-    local zz = round(G.TheInput:GetWorldPosition().z)
-    CenterLocate = G.Vector3(xx, 0, zz)
+    local x, z = GetCursorPosition()
+    CenterLocate = G.Vector3(round(x), 0, round(z))
   end
   if not SecondLocate then
-    local xx, yy, zz = G.ThePlayer.Transform:GetWorldPosition()
-    xx = round(xx)
-    zz = round(zz)
-    SecondLocate = G.Vector3(xx, 0, zz)
+    local x, z = GetPlayerPosition()
+    SecondLocate = G.Vector3(round(x), 0, round(z))
   end
   HideAll()
   CorrectionSetting = (CorrectionSetting + 1) % TotalSetting
@@ -517,18 +523,14 @@ end
 
 local function SetFirstPoint()
   if not InGame() then return end
-  -- local xx = round(G.TheInput:GetWorldPosition().x)
-  -- local zz = round(G.TheInput:GetWorldPosition().z)
-  local p = G.TheInput:GetWorldPosition()
-  CenterLocate = G.Vector3(round(p.x), 0, round(p.z))
+  local x, z = GetCursorPosition()
+  CenterLocate = G.Vector3(round(x), 0, round(z))
 end
 
 local function SetSecondPoint()
   if not InGame() then return end
-  -- local xx = round(G.TheInput:GetWorldPosition().x)
-  -- local zz = round(G.TheInput:GetWorldPosition().z)
-  local p = G.TheInput:GetWorldPosition()
-  SecondLocate = G.Vector3(round(p.x), 0, round(p.z))
+  local x, z = GetCursorPosition()
+  SecondLocate = G.Vector3(round(x), 0, round(z))
   HightlightSecond()
 end
 
