@@ -5,8 +5,13 @@ Assets = { Asset('ANIM', 'anim/circleplacer.zip') }
 
 local G = GLOBAL
 
-local Task = nil
+-- precise walk to target position
 local WALK_DELAY = 0.8
+local target_x, target_z = nil, nil
+local walk_task = nil
+local player_previous_x, player_previous_z = nil, nil
+local should_stop_walk = false
+local step_distance = nil
 
 local CorrectionSetting = 0
 local Settings = {
@@ -30,6 +35,12 @@ local function IsWalkButtonDown()
     G.CONTROL_MOVE_LEFT,
     G.CONTROL_MOVE_RIGHT
   )
+end
+
+local function IsPlayerBusy()
+  local is_idle = G.ThePlayer:HasTag('idle')
+  local is_doing_or_working = G.ThePlayer.components.playercontroller:IsDoingOrWorking()
+  return not is_idle or is_doing_or_working
 end
 
 function round(num)
@@ -216,45 +227,42 @@ local function GetPlayerPosition()
   return x, z
 end
 
-local function CalculateDistance(target_x, target_z)
+local function GetDistances(x, z)
   local player_x, player_z = GetPlayerPosition()
-  local dx = target_x - player_x
-  local dz = target_z - player_z
-  return math.sqrt(dx ^ 2 + dz ^ 2)
+  local dx = x - player_x
+  local dz = z - player_z
+  local d = math.sqrt(dx ^ 2 + dz ^ 2) -- the distance between player and given position
+  return d, dx, dz
 end
 
-local function LongWalk(pos)
-  local act = G.BufferedAction(G.ThePlayer, nil, G.ACTIONS.WALKTO, G.ThePlayer.replica.inventory:GetActiveItem(), pos)
-  if G.ThePlayer.components.playercontroller:CanLocomote() then
-    act.preview_cb = function() G.SendRPCToServer(G.RPC.LeftClick, act.action.code, pos.x, pos.z, nil, true) end
+local function WalkTo(x, z)
+  local act = G.BufferedAction(G.ThePlayer, nil, G.ACTIONS.WALKTO, nil, G.Vector3(x, 0, z))
+  if G.ThePlayer.components.playercontroller:CanLocomote() then -- forest-only world
+    act.preview_cb = function() G.SendRPCToServer(G.RPC.LeftClick, act.action.code, x, z, nil, true) end
     G.ThePlayer.components.playercontroller:DoAction(act)
-  else
-    G.SendRPCToServer(G.RPC.LeftClick, act.action.code, pos.x, pos.z, nil, nil, nil, act.action.canforce)
+  else -- forest-cave world
+    G.SendRPCToServer(G.RPC.LeftClick, act.action.code, x, z, nil, nil, nil, act.action.canforce)
   end
 end
 
-local function ShortStep(pos)
-  if pos then
-    local distance = CalculateDistance(pos.x, pos.z)
-    if distance > 0 then
-      local x, z = GetPlayerPosition()
-      local direction = (G.Vector3(pos.x - x, 0, pos.z - z) / distance) * 0.165
-      local destination = G.Vector3(x + direction.x, 0, z + direction.z)
-      LongWalk(destination)
-    end
-  end
+local DELTA_RATIO = 1 / 6
+local function BabyStepTo(x, z)
+  local player_x, player_z = GetPlayerPosition()
+  if player_x == x and player_z == z then return end
+  local distance, dx, dz = GetDistances(x, z)
+  local delta = G.Vector3(dx, 0, dz) * DELTA_RATIO / distance
+  WalkTo(player_x + delta.x, player_z + delta.z)
 end
 
-local function GetRoutePosition(player_radius, target_radius, x, z)
-  local d = CalculateDistance(x, z) -- distance between centers of player circle and target circle
+local function GetRoutePosition(player_radius)
+  local d, dx, dz = GetDistances(target_x, target_z)
   if d == 0 then return nil end
 
-  --  distance from player to its projection of target circle
-  local dp = (player_radius ^ 2 - target_radius ^ 2 + d ^ 2) / (2 * d)
+  -- distance from player to its projection of target circle
+  local dp = (player_radius ^ 2 - step_distance ^ 2 + d ^ 2) / (2 * d)
   if player_radius < dp then return nil end
 
   local player_x, player_z = GetPlayerPosition()
-  local dx, dz = x - player_x, z - player_z
   local projection_x = player_x + dx * dp / d
   local projection_z = player_z + dz * dp / d
 
@@ -265,70 +273,60 @@ local function GetRoutePosition(player_radius, target_radius, x, z)
   return G.Vector3(intersection_x, 0, intersection_z)
 end
 
-local PreviousPlayerPost = nil
-local AngleStep = true
+local function Tip(message) return G.ThePlayer.components.talker:Say(message) end
 
-local function SayFinalDistance(inst, PointX, PointZ)
-  G.ThePlayer.components.talker:Say(tostring(CalculateDistance(PointX, PointZ)))
+local function SayFinalDistance() Tip(tostring(GetDistances(target_x, target_z))) end
+
+local function StopPreciseWalk()
+  should_stop_walk = false
+  step_distance = nil
+  if walk_task then walk_task:Cancel() end
 end
 
-local function StartPreciseWalk(inst, PointX, PointZ, StepDistance)
-  local Distate = 0
-  if IsWalkButtonDown() then return end
-  if G.ThePlayer:HasTag('idle') and not G.ThePlayer.components.playercontroller:IsDoingOrWorking() then
-    if StepDistance then
-      if CalculateDistance(PointX, PointZ) > 0.3 then
-        LongWalk(G.Vector3(PointX, 0, PointZ))
+local function StartPreciseWalk(player)
+  if IsWalkButtonDown() then
+    StopPreciseWalk()
+    return
+  end
+  if IsPlayerBusy() then
+    walk_task = player:DoTaskInTime(WALK_DELAY, StartPreciseWalk)
+    return
+  end
+  if step_distance == nil then
+    if player_previous_x == nil or player_previous_z == nil then
+      player_previous_x, player_previous_z = GetPlayerPosition()
+      BabyStepTo(target_x, target_z)
+    else
+      local d = GetDistances(player_previous_x, player_previous_z)
+      if d > 0.01 then step_distance = d end
+      player_previous_x, player_previous_z = nil, nil
+    end
+  else
+    if GetDistances(target_x, target_z) > 0.3 then
+      WalkTo(target_x, target_z)
+    else
+      if should_stop_walk then
+        BabyStepTo(target_x, target_z)
+        StopPreciseWalk()
+        player:DoTaskInTime(WALK_DELAY, SayFinalDistance)
+        return
       else
-        if AngleStep then
-          local RelativeDistance = math.floor(CalculateDistance(PointX, PointZ) / StepDistance)
-          if RelativeDistance < 2 then
-            AngPos = GetRoutePosition(StepDistance, StepDistance, PointX, PointZ)
-            if AngPos then
-              ShortStep(AngPos)
-              AngleStep = false
-            else
-              AngleStep = true
-              Task = nil
-              G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
-              return
-            end
-          else
-            AngPos = GetRoutePosition(RelativeDistance * StepDistance, StepDistance, PointX, PointZ)
-            if AngPos then
-              ShortStep(AngPos)
-            else
-              AngleStep = true
-              Task = nil
-              G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
-              return
-            end
-          end
+        local relative_distance = math.floor(GetDistances(target_x, target_z) / step_distance)
+        local is_too_close = relative_distance < 2
+        local player_radius = is_too_close and step_distance or (relative_distance * step_distance)
+        local route_position = GetRoutePosition(player_radius)
+        if route_position then
+          BabyStepTo(route_position.x, route_position.z)
+          should_stop_walk = is_too_close
         else
-          ShortStep(G.Vector3(PointX, 0, PointZ))
-          AngleStep = true
-          Task = nil
-          G.ThePlayer:DoTaskInTime(WALK_DELAY, SayFinalDistance, PointX, PointZ)
+          StopPreciseWalk()
+          player:DoTaskInTime(WALK_DELAY, SayFinalDistance)
           return
         end
       end
-    else
-      if PreviousPlayerPost == nil then
-        local player_x, player_z = GetPlayerPosition()
-        PreviousPlayerPost = G.Vector3(player_x, 0, player_z)
-        ShortStep(G.Vector3(PointX, 0, PointZ))
-      else
-        local d = CalculateDistance(PreviousPlayerPost.x, PreviousPlayerPost.z)
-        if d > 0.01 then Distate = d end
-        PreviousPlayerPost = nil
-      end
     end
   end
-  if Distate > 0 then
-    Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, PointX, PointZ, Distate)
-  else
-    Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, PointX, PointZ, StepDistance)
-  end
+  walk_task = player:DoTaskInTime(WALK_DELAY, StartPreciseWalk)
 end
 
 local function GetCursorPosition()
@@ -430,7 +428,7 @@ local function GetCorrectPoint()
     --z = CircleSet.z
   end
 
-  return G.Vector3(x, 0, z)
+  return x, z
 end
 
 local gridplacer
@@ -446,8 +444,8 @@ local function HightlightDrop()
     end
   end
   gridplacer:Show()
-  local SD = GetCorrectPoint()
-  gridplacer.Transform:SetPosition(SD.x, -0.1, SD.z)
+  local x, z = GetCorrectPoint()
+  gridplacer.Transform:SetPosition(x, -0.1, z)
   HightlightCloset()
 end
 
@@ -510,15 +508,15 @@ local function ChangePlacementType()
   end
   HideAll()
   CorrectionSetting = (CorrectionSetting + 1) % TotalSetting
-  G.ThePlayer.components.talker:Say(Settings[CorrectionSetting])
+  Tip(Settings[CorrectionSetting])
 end
 
 local function ToggleAlignTarget()
   GridTweak = not GridTweak
   if GridTweak then
-    G.ThePlayer.components.talker:Say('[Place Statues] Align to Wall')
+    Tip('[Place Statues] Align to Wall')
   else
-    G.ThePlayer.components.talker:Say('[Place Statues] Align to Turf')
+    Tip('[Place Statues] Align to Turf')
   end
 end
 
@@ -549,11 +547,9 @@ local function TogglePreciseWalk()
   if not InGame() then return end
   is_enabled = not is_enabled
   if not is_enabled then
-    G.ThePlayer.components.talker:Say('[Place Statues] Precise Walk Disabled')
+    Tip('[Place Statues] Precise Walk Disabled')
   else
-    G.ThePlayer.components.talker:Say(
-      '[Place Statues] Precision Walk Enabled\nPlease disable lag compensation\n Use  to walk'
-    )
+    Tip('[Place Statues] Precision Walk Enabled\nPlease disable lag compensation\n Use  to walk')
   end
   ToggleIndicator()
 end
@@ -597,14 +593,10 @@ AddComponentPostInit('playercontroller', function(self)
 
   local OldOnLeftUp = self.OnLeftUp
   self.OnLeftUp = function(self)
+    StopPreciseWalk()
     if InGame() and IsEnabled() and G.TheInput:GetHUDEntityUnderMouse() == nil then
-      if Task ~= nil then
-        Task:Cancel()
-        Task = nil
-      end
-
-      local pos = GetCorrectPoint()
-      Task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk, pos.x, pos.z)
+      target_x, target_z = GetCorrectPoint()
+      walk_task = G.ThePlayer:DoTaskInTime(WALK_DELAY, StartPreciseWalk)
     end
     return OldOnLeftUp(self)
   end
