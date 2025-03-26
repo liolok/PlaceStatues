@@ -28,15 +28,6 @@ local CenterLocate = nil
 local SecondLocate = nil
 local GridTweak = false
 
-local function IsWalkButtonDown()
-  return G.ThePlayer.components.playercontroller:IsAnyOfControlsPressed(
-    G.CONTROL_MOVE_UP,
-    G.CONTROL_MOVE_DOWN,
-    G.CONTROL_MOVE_LEFT,
-    G.CONTROL_MOVE_RIGHT
-  )
-end
-
 local function IsPlayerBusy()
   local is_idle = G.ThePlayer:HasTag('idle')
   local is_doing_or_working = G.ThePlayer.components.playercontroller:IsDoingOrWorking()
@@ -284,10 +275,6 @@ local function StopPreciseWalk()
 end
 
 local function StartPreciseWalk(player)
-  if IsWalkButtonDown() then
-    StopPreciseWalk()
-    return
-  end
   if IsPlayerBusy() then
     walk_task = player:DoTaskInTime(WALK_DELAY, StartPreciseWalk)
     return
@@ -583,11 +570,13 @@ AddComponentPostInit('playercontroller', function(self)
 
   local OldOnUpdate = self.OnUpdate
   self.OnUpdate = function(self, ...)
-    if InGame() then
-      local item = G.ThePlayer.replica.inventory:GetEquippedItem(G.EQUIPSLOTS.BODY)
-      is_carrying = item and item:HasTag('heavy')
-      ToggleIndicator()
-    end
+    if not InGame() then return OldOnUpdate(self, ...) end
+    local item = G.ThePlayer.replica.inventory:GetEquippedItem(G.EQUIPSLOTS.BODY)
+    is_carrying = item and item:HasTag('heavy')
+    ToggleIndicator()
+    local is_moving =
+      self:IsAnyOfControlsPressed(G.CONTROL_MOVE_UP, G.CONTROL_MOVE_DOWN, G.CONTROL_MOVE_LEFT, G.CONTROL_MOVE_RIGHT)
+    if is_moving or not IsEnabled() then StopPreciseWalk() end
     return OldOnUpdate(self, ...)
   end
 
