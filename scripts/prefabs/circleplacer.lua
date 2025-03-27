@@ -1,6 +1,4 @@
-local assets = {
-  Asset('ANIM', 'anim/circleplacer.zip'),
-}
+local assets = { Asset('ANIM', 'anim/circleplacer.zip') }
 
 local function fn()
   local inst = CreateEntity()
@@ -22,7 +20,7 @@ local function fn()
   inst.Transform:SetScale(1.5, 1.5, 1.5)
 
   -- inst:AddComponent("placer")
-  -- from gridplacer, not sure what this is supposed to be doing, but seems irrelevant here
+  -- Tranoze: from gridplacer, not sure what this is supposed to be doing, but seems irrelevant here
   -- inst.components.placer.oncanbuild = inst.Show
   -- inst.components.placer.oncannotbuild = inst.Hide
 
