@@ -158,11 +158,6 @@ end
 local function ManualToggle()
   if not InGame() then return end
   is_enabled = not is_enabled
-  if is_enabled then
-    Tip('[Place Statues] Precise Walk Enabled\nPlease disable lag compensation\n Use  to walk')
-  else
-    Tip('[Place Statues] Precise Walk Disabled')
-  end
 end
 
 local function ChangeLayout()
@@ -353,13 +348,15 @@ AddComponentPostInit('playercontroller', function(self) -- injection
     is_init = true
   end)
 
+  local S = G.STRINGS.UI.OPTIONS
+  local previous_status = false -- not enabled at first
   local OldOnUpdate = self.OnUpdate
   self.OnUpdate = function(self, ...)
     if not InGame() then return OldOnUpdate(self, ...) end
 
     -- is player carrying heavy item?
     local item = G.ThePlayer.replica.inventory:GetEquippedItem(G.EQUIPSLOTS.BODY)
-    is_carrying = item and item:HasTag('heavy')
+    is_carrying = item and item:HasTag('heavy') or false
 
     -- handle circles visibility
     for _, indicator in pairs(indicators) do
@@ -372,11 +369,26 @@ AddComponentPostInit('playercontroller', function(self) -- injection
       if LAYOUT[index] == 'line' then Show(indicators.second, second_point.x, second_point.z) end
     end
 
+    -- show tip when toggle and handle Movement Prediction
+    if IsEnabled() ~= previous_status then
+      print(IsEnabled(), previous_status)
+      local msg = string.format('[%s] Precise Walk ', modinfo.name)
+      msg = msg .. (IsEnabled() and 'Enabled: Use  to Walk' or 'Disabled')
+      if G.Profile:GetMovementPredictionEnabled() then
+        local enabled = not IsEnabled() -- disable movement prediction when precise walk enabled
+        G.ThePlayer:EnableMovementPrediction(enabled)
+        local status = enabled and S.MOVEMENTPREDICTION_ENABLED or S.MOVEMENTPREDICTION_DISABLED
+        msg = msg .. '\n' .. S.MOVEMENTPREDICTION .. status
+      end
+      Tip(msg)
+    end
+
     -- stop precise walk task if user presses to move or circles hidden
     local is_moving =
       self:IsAnyOfControlsPressed(G.CONTROL_MOVE_UP, G.CONTROL_MOVE_DOWN, G.CONTROL_MOVE_LEFT, G.CONTROL_MOVE_RIGHT)
     if is_moving or not IsEnabled() then StopPreciseWalk() end
 
+    previous_status = IsEnabled()
     return OldOnUpdate(self, ...)
   end
 
