@@ -23,7 +23,7 @@ local function GetDistances(x, z)
   return distance, dx, dz
 end
 
-local function Tip(message) return G.ThePlayer.components.talker:Say(message) end
+local function Tip(message) return G.ThePlayer.components.talker:Say(message, nil, true, true) end
 
 local function ReportFinalDistance() Tip(tostring(GetDistances(target_x, target_z))) end
 
@@ -127,15 +127,13 @@ end
 -- key bindings
 
 modimport('keybind')
+modimport('languages/en') -- load translation strings with English fallback
+local lang = 'languages/' .. G.LOC.GetLocaleCode()
+if G.kleifileexists(MODROOT .. lang .. '.lua') then modimport(lang) end
+local S = G.STRINGS.PLACE_STATUES
 
 local AUTO_ENABLE = GetModConfigData('auto_precise_walk') -- did user configure "Auto Precise Walk" to true?
 local LAYOUT = { 'grid', 'circle', 'hexagon', 'line' }
-local S = {
-  grid = '[Place Statues]\nGrid',
-  circle = '[Place Statues]\nCircle\n(need set center point)',
-  hexagon = '[Place Statues]\nHexagon\n(need set center point)',
-  line = '[Place Statues]\nLine\n(need set start & end point)',
-}
 local index = 1 -- to cycle through layouts, need reset to 1 when greater than #LAYOUT.
 local is_init = false -- is circles and first/second points initialized yet?
 local is_enabled = false -- does player enable precise walk manually?
@@ -166,14 +164,13 @@ local function ChangeLayout()
   first_point = G.Vector3(round(x), 0, round(z))
   index = index + 1
   if index > #LAYOUT then index = 1 end -- loop back to first element
-  Tip(S[LAYOUT[index]])
+  Tip(S.NAME .. '\n' .. S.TIP_MESSAGE[LAYOUT[index]])
 end
 
 local function ToggleAlignTarget()
   if not IsEnabled() then return end
   is_align_wall = not is_align_wall
-  local target = is_align_wall and 'Wall' or 'Turf'
-  Tip('[Place Statues] Align to ' .. target)
+  Tip(S.NAME .. S.ALIGN_TO .. (is_align_wall and S.WALL or S.TURF))
 end
 
 local function SetFirstPoint()
@@ -348,7 +345,9 @@ AddComponentPostInit('playercontroller', function(self) -- injection
     is_init = true
   end)
 
-  local S = G.STRINGS.UI.OPTIONS
+  local PREDICTION = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION
+  local PREDICTION_ENABLED = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_ENABLED
+  local PREDICTION_DISABLED = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_DISABLED
   local previous_status = false -- not enabled at first
   local OldOnUpdate = self.OnUpdate
   self.OnUpdate = function(self, ...)
@@ -371,14 +370,11 @@ AddComponentPostInit('playercontroller', function(self) -- injection
 
     -- show tip when toggle and handle Movement Prediction
     if IsEnabled() ~= previous_status then
-      print(IsEnabled(), previous_status)
-      local msg = string.format('[%s] Precise Walk ', modinfo.name)
-      msg = msg .. (IsEnabled() and 'Enabled: Use  to Walk' or 'Disabled')
+      local msg = S.NAME .. ' ' .. S.PRECISE_WALK .. (IsEnabled() and S.ENABLED or S.DISABLED)
       if G.Profile:GetMovementPredictionEnabled() then
         local enabled = not IsEnabled() -- disable movement prediction when precise walk enabled
         G.ThePlayer:EnableMovementPrediction(enabled)
-        local status = enabled and S.MOVEMENTPREDICTION_ENABLED or S.MOVEMENTPREDICTION_DISABLED
-        msg = msg .. '\n' .. S.MOVEMENTPREDICTION .. status
+        msg = msg .. '\n' .. PREDICTION .. (enabled and PREDICTION_ENABLED or PREDICTION_DISABLED)
       end
       Tip(msg)
     end
