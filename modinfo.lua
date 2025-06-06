@@ -2,8 +2,8 @@ local function T(en, zh, zht) return ChooseTranslationTable({ en, zh = zh, zht =
 
 name = T('Place Statues', '雕像摆放')
 author = T('Tranoze, liolok', 'Tranoze、李皓奇')
-local date = '2025-04-13'
-version = date .. '-1' -- for revision in same day
+local date = '2025-06-06'
+version = date .. '' -- for revision in same day
 description = T(
   [[Let you walk to a precise position, to place heavy item like statues or giant vegetables.
 Supported layout: grid/circle/hexagon/line, press key to change.
