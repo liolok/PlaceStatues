@@ -346,8 +346,9 @@ AddComponentPostInit('playercontroller', function(self) -- injection
   end)
 
   local PREDICTION = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION
-  local PREDICTION_ENABLED = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_ENABLED
-  local PREDICTION_DISABLED = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_DISABLED
+  local SEPARATION = PREDICTION:sub(-1) == ':' and ' ' or ''
+  local PREDICTION_ON = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_ENABLED
+  local PREDICTION_OFF = G.STRINGS.UI.OPTIONS.MOVEMENTPREDICTION_DISABLED
   local previous_status = false -- not enabled at first
   local OldOnUpdate = self.OnUpdate
   self.OnUpdate = function(self, ...)
@@ -373,7 +374,7 @@ AddComponentPostInit('playercontroller', function(self) -- injection
       if G.Profile:GetMovementPredictionEnabled() then
         local enabled = not IsEnabled() -- disable movement prediction when precise walk enabled
         G.ThePlayer:EnableMovementPrediction(enabled)
-        msg = msg .. '\n' .. PREDICTION .. (enabled and PREDICTION_ENABLED or PREDICTION_DISABLED)
+        msg = msg .. '\n' .. PREDICTION .. SEPARATION .. (enabled and PREDICTION_ON or PREDICTION_OFF)
       end
       Tip(msg)
     end
