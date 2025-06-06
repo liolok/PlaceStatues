@@ -354,8 +354,7 @@ AddComponentPostInit('playercontroller', function(self) -- injection
     if not InGame() then return OldOnUpdate(self, ...) end
 
     -- is player carrying heavy item?
-    local item = G.ThePlayer.replica.inventory:GetEquippedItem(G.EQUIPSLOTS.BODY)
-    is_carrying = item and item:HasTag('heavy') or false
+    is_carrying = G.ThePlayer.replica.inventory:IsHeavyLifting()
 
     -- handle circles visibility
     for _, indicator in pairs(indicators) do
